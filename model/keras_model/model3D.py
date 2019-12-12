@@ -9,7 +9,7 @@ Date: November 2019
 '''
 
 from .model import KerasModelBase
-from keras.layers import Deconvolution3D, UpSampling3D
+from keras.layers import Conv3D, Activation, BatchNormalization, Deconvolution3D, UpSampling3D
 
 class Model3D(KerasModelBase):
     """ Unet model
@@ -41,5 +41,17 @@ class Model3D(KerasModelBase):
                                    strides=strides)
         else:
             return UpSampling3D(size=pool_size)
+
+    def convolution_block(input_layer, 
+                   n_filters, 
+                   batch_normalization=True, 
+                   kernel=(3, 3, 3), 
+                   activation='relu',
+                   padding='same', 
+                   strides=(1, 1, 1)):
+        layer = Conv3D(n_filters, kernel, padding=padding, strides=strides)(input_layer)
+        if batch_normalization:
+            layer = BatchNormalization(axis= -1)(layer)
+        return Activation(activation)(layer)
         
         

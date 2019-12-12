@@ -37,10 +37,7 @@ class KerasModelBase(metaclass = abc.ABCMeta):
     @abc.abstractmethod
     def predict(self, test_img):
         pass
-    
-    @abc.abstractmethod
-    def get_up_convolution(n_filters, pool_size, kernel_size, strides, deconvolution):
-        pass
+
         
         
     

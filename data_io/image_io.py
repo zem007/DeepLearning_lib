@@ -21,7 +21,7 @@ class ImageIo(DataIoBase):
     def __init__(self):
         pass
         
-    def load(image_path):
+    def load(self, image_path):
         img = sitk.ReadImage(image_path)
         img_array = sitk.GetArrayFromImage(img)
         img_array = img_array.transpose(2,1,0) # zyx to xyz

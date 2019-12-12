@@ -19,37 +19,26 @@ class NumpyIo(ImageIo):
         Returns:
             
     """
-    def __init__(self, data_save_path):
+    def __init__(self):
 #         ImageIo.__init__(self, image_path)
 #         self.data_load_path = data_load_path
-        self.data_save_path = data_save_path
-    
-    def load_array(self):
-        save_path = self.data_save_path
-        if os.path.exists(save_path):
-            print('load data from: ', save_path)
-            x_train = np.load(os.path.join(save_path, 'x_train.npy'))
-            labels_train = np.load(os.path.join(save_path, 'labels_train.npy'))
-            x_test = np.load(os.path.join(save_path, 'x_test.npy'))
-            labels_test = np.load(os.path.join(save_path, 'labels_test.npy'))
-            data_seperate = np.load(os.path.join(save_path, 'data_seperate.npy'))
-            print('load data completed!')
-            return (x_train, labels_train), (x_test, labels_test), data_seperate
+#         self.data_save_path = data_save_path
+        pass
+
+
+    def load(self, file_path, file_name):
+        if os.path.exists(file_path):
+            data_array = np.load(os.path.join(file_path, file_name))
+            print('load ', file_name, ' completed!')
+            return data_array
         else:
-            print(save_path, ' does not exist!')
+            print(file_path, ' does not exists!')
             
-    def save_array(self, x_train, labels_train, x_test, labels_test, data_seperate):
-        save_path = self.data_save_path
-        os.mkdir(save_path)
-        np.save(os.path.join(save_path, 'x_train.npy'), x_train)
-        np.save(os.path.join(save_path, 'labels_train.npy'), labels_train)
-        np.save(os.path.join(save_path, 'x_test.npy'), x_test)
-        np.save(os.path.join(save_path, 'labels_test.npy'), labels_test)
-        np.save(os.path.join(save_path, 'data_seperate.npy'), data_seperate)
-        print('data saved to: ', str(save_path))
+    def save(self, save_path, save_name, data):
+        if os.path.exists(save_path) == False:
+            os.mkdir(save_path)
+        np.save(os.path.join(save_path, save_name), data)
+        print(save_name, ' saved to: ', str(save_path))
+
         
-    def to_array(self, image_path):
-        # get one image array
-        img_array = ImageIo.load(image_path)
-        return img_array
         
