@@ -19,26 +19,21 @@ class NumpyIo(ImageIo):
         Returns:
             
     """
-    def __init__(self):
-#         ImageIo.__init__(self, image_path)
-#         self.data_load_path = data_load_path
-#         self.data_save_path = data_save_path
+    def __init__(DataIoBase):
         pass
 
 
-    def load(self, file_path, file_name):
-        if os.path.exists(file_path):
-            data_array = np.load(os.path.join(file_path, file_name))
-            print('load ', file_name, ' completed!')
-            return data_array
-        else:
-            print(file_path, ' does not exists!')
+    def load(self, path):
+        data_array = np.load(path)
+        print('load ', path, ' completed!')
+        return data_array
             
-    def save(self, save_path, save_name, data):
-        if os.path.exists(save_path) == False:
-            os.mkdir(save_path)
-        np.save(os.path.join(save_path, save_name), data)
-        print(save_name, ' saved to: ', str(save_path))
+    def save(self, path, data):
+        dirname = os.path.dirname(path)
+        if os.path.exists(dirname) == False:
+            os.mkdir(dirname)
+        np.save(path, data)
+        print('saved to: ', path)
 
         
         

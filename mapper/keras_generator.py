@@ -1,4 +1,6 @@
+import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
+from keras.utils import np_utils
 
 def keras_image_generator():
     datagen = ImageDataGenerator(
@@ -35,4 +37,10 @@ def keras_image_generator():
             # 随机翻转图像
             vertical_flip=False)
     return datagen
+
+def image_generator_2Dto3D(data, label, datagen, class_num, batch_size = 8, shuffle=True):  #Input dim (n,64,64,64)
+    datagen.fit(data)
+    for data_batch, label_batch in datagen.flow(data, label, batch_size=batch_size, shuffle = shuffle):
+        yield(np.expand_dims(data_batch, axis=-1), np_utils.to_categorical(label_batch, class_num))
+
 

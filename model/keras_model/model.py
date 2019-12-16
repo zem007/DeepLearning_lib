@@ -15,7 +15,7 @@ class KerasModelBase(metaclass = abc.ABCMeta):
     """
     
     @abc.abstractmethod
-    def build_model(self):
+    def build(self):
         pass
         
     @abc.abstractmethod
@@ -27,15 +27,23 @@ class KerasModelBase(metaclass = abc.ABCMeta):
         pass
     
     @abc.abstractmethod
-    def train_model(self):
+    def train(self):
         pass
     
     @abc.abstractmethod
-    def load_model(self):
+    def train_generator(self):
+        pass
+    
+    @abc.abstractmethod
+    def load(self):
         pass
     
     @abc.abstractmethod
     def predict(self, test_img):
+        pass
+    
+    @abc.abstractmethod
+    def evaluate(self, x_test, labels_test):
         pass
 
         

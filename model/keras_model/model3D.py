@@ -17,7 +17,7 @@ class Model3D(KerasModelBase):
     def __init__(self):
         pass
         
-    def build_model(self):
+    def build(self):
         pass
         
     def compile_model(self):
@@ -26,13 +26,19 @@ class Model3D(KerasModelBase):
     def callbacks(self):
         pass
     
-    def train_model(self):
+    def train(self):
         pass
     
-    def load_model(self):
+    def train_generator(self):
+        pass
+    
+    def load(self):
         pass
     
     def predict(self, test_img):
+        pass
+    
+    def predict(self, x_test, labels_test):
         pass
     
     def get_up_convolution(n_filters, pool_size, kernel_size=(2, 2, 2), strides=(2, 2, 2), deconvolution=False):

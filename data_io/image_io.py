@@ -21,13 +21,13 @@ class ImageIo(DataIoBase):
     def __init__(self):
         pass
         
-    def load(self, image_path):
-        img = sitk.ReadImage(image_path)
+    def load(self, path):
+        img = sitk.ReadImage(path)
         img_array = sitk.GetArrayFromImage(img)
         img_array = img_array.transpose(2,1,0) # zyx to xyz
         return img_array
     
-    def save(self):
+    def save(self, path, data):
         pass
     
     

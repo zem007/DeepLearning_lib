@@ -18,9 +18,6 @@ class DataIoBase(metaclass = abc.ABCMeta):
         pass
     
     @abc.abstractmethod
-    def save(self):
+    def save(self, path, data):
         pass
         
-#     @abc.abstractmethod
-#     def write(self):
-#         pass
