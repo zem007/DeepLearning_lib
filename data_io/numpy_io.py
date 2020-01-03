@@ -9,9 +9,9 @@ Date: Novemeber 2019
 '''
 import os
 import numpy as np
-from .image_io import ImageIo
+from .data_io import DataIoBase
 
-class NumpyIo(ImageIo):
+class NumpyIo(DataIoBase):
     """ pd.dataframe io
 
         Args:
@@ -19,21 +19,18 @@ class NumpyIo(ImageIo):
         Returns:
             
     """
-    def __init__(DataIoBase):
+    def __init__(self):
         pass
 
 
-    def load(self, path):
-        data_array = np.load(path)
-        print('load ', path, ' completed!')
+    def load(self, filename):
+        data_array = np.load(filename)
+        print('load ', filename, ' completed!')
         return data_array
             
-    def save(self, path, data):
-        dirname = os.path.dirname(path)
-        if os.path.exists(dirname) == False:
-            os.mkdir(dirname)
-        np.save(path, data)
-        print('saved to: ', path)
+    def save(self, filename, data):
+        super().create_folder(filename)
+        np.save(filename, data)
+        print('saved to: ', filename)
 
-        
         

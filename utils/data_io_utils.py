@@ -3,20 +3,19 @@ import os
 import random
 
 
-def get_file_dir_lists(load_path, drop_data_list):
+def get_file_dir_lists(load_path, drop_list):
     image_dir = os.listdir(load_path)
     img_dir_list = [(load_path + i) for i in sorted(image_dir)]
             
     # drop data that cant be used
-    for data_name in drop_data_list:
-        if data_name in img_dir_list:
-            img_dir_list.remove(data_name)
-            print(data_name, ' dropped!')
+    for name in drop_list:
+        img_dir_list = list(filter(lambda x: (name not in x), img_dir_list))
+        print(name, 'dropped!')
     
     return img_dir_list
 
 
-def split_dataset(img_list, split_id = -19, test_id=[0], val_id=[1]):
+def split_dataset(img_list, split_id, test_id, val_id):
     img_train_list = []
     img_test_list = []
     img_val_list = []

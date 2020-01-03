@@ -8,16 +8,24 @@ Date: August 2019
 2016-2019 All Right Reserved
 '''
 import abc
+import os
 
 class DataIoBase(metaclass = abc.ABCMeta):
     """ Data Io base class
     """
     
     @abc.abstractmethod
-    def load(self, image_path):
+    def load(self, filename):
         pass
     
     @abc.abstractmethod
-    def save(self, path, data):
+    def save(self, filename, data):
         pass
+    
+    def create_folder(self, filename):
+        dirname = os.path.dirname(filename)
+        if os.path.exists(dirname) == False:
+            os.mkdir(dirname)
+        else: 
+            pass
         
