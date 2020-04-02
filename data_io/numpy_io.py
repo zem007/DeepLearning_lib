@@ -1,23 +1,18 @@
 # -*- encoding: utf-8 -*-
-''' module discription: numpy io, derived class from ImageIo in image_io.py
+''' module discription: numpy io, base class is DataIoBase in data_io.py
 
 Author: Ze Ma
 Date: Novemeber 2019
 
 (C) Copyright: Unionstrong (Beijing) Technology Co., Ltd
-2016-2019 All Right Reserved
+2016-2020 All Right Reserved
 '''
 import os
 import numpy as np
 from .data_io import DataIoBase
 
 class NumpyIo(DataIoBase):
-    """ pd.dataframe io
-
-        Args:
-        
-        Returns:
-            
+    """ manipulate np.array
     """
     def __init__(self):
         pass

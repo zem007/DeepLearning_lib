@@ -57,7 +57,7 @@ parser.add_argument('--epochs', default = 100)
 parser.add_argument('--verbose', default = 1)
 parser.add_argument('--shuffle', default = True)
 
-drop_list = ['A002.P000208', 'A003.P000143']
+drop_list = ['A002.P000208', 'A003.P000143', 'A002.P000927', 'A002.P001661']
 # drop_img_list = ['/data/maze/04.AN-AI/01.CVAImage/A002.P000208.D01.S004CVAImage.mha', 
 #             '/data/maze/04.AN-AI/01.CVAImage/A003.P000143.D01.S001CVAImage.mha']
 # drop_an_list = ['/data/maze/04.AN-AI/03.Aneurysms/A002.P000208.D01.S004Aneurysms.mha', 
@@ -77,6 +77,17 @@ drop_list = ['A002.P000208', 'A003.P000143']
 
 
 def get_small_image_mask_block(x_image, mask_image, vessel_image, size):
+    """ get 3d small image and mask block from the original size image and mask
+       Args:
+           x_image: original image, np.array of shape (x, y, z)
+           mask_image: an mask, np.array of shape (x, y, z), 0 for background and vessel, 1,2,3... for each an
+           vessel_image: vessel mask, np.array of shape (x, y, z), 0 for background, 1 for vessel
+           size: int, eg. 64, 128, 256...
+       Returns:
+           small_img_array: np.array of shape (size, size, size), cut from original image
+           small_mask_array: np.array of shape (size, size, size), cut from mask
+           
+    """
     small_img_list = []
     small_mask_list = []
     # normlization raw image array first
@@ -96,6 +107,22 @@ def get_small_image_mask_block(x_image, mask_image, vessel_image, size):
     return small_img_array, small_mask_array
 
 def generate_data(ImageIo, NumpyIo, image_path, an_path, vessel_path, drop_list, block_size = 64, save = False, save_path = None):
+    """generate train, val and test dataset from the original image and mask. convert them to np.array and save
+        Args:
+            ImageIo: image io class
+            NumpyIo: numpy io class
+            image_path: orginal image saving path
+            an_path: an saving path
+            vessel_path: vessel saving path
+            drop_list: list of str, indicating samples that are needed to be dropped
+            block_size: int, indicating the small image block size
+            save: bool, save the datasets or not
+            save_path: if save is True, save the three dataset to the path
+        Returns:
+            (x_train, labels_train), (x_test, labels_test), (x_val, labels_val):
+                Three datasets, and each one includes both images and labels 
+            data_seperate: list of list, the filename for each sample and its corresponding dataset
+    """
         print('load img from the source dir: ', image_path)
         img_dir_list = get_file_dir_lists(image_path, drop_list)
         print('load an from the source dir: ', an_path)

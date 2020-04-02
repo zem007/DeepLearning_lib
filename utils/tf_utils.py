@@ -4,489 +4,157 @@ Date: November 2016
 """
 
 import numpy as np
-import tensorflow as tf
-
-
-def _variable_on_cpu(name, shape, initializer, use_fp16=False):
-    """ Helper to create a Variable stored on CPU memory.
-
-        Args:
-            name: name of the variable
-            shape: list of ints
-            initializer: initializer for Variable
-
-        Returns:
-            Variable Tensor
-    """
-    with tf.device('/cpu:0'):
-        dtype = tf.float16 if use_fp16 else tf.float32
-        var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
-    return var
-
-def _variable_with_weight_decay(name, shape, stddev, wd, use_xavier=True):
-    """ Helper to create an initialized Variable with weight decay.
-        Note that the Variable is initialized with a truncated normal distribution.
-        A weight decay is added only if one is specified.
-
-        Args:
-            name: name of the variable
-            shape: list of ints
-            stddev: standard deviation of a truncated Gaussian
-            wd: add L2Loss weight decay multiplied by this float. If None, weight
-                decay is not added for this Variable.
-            use_xavier: bool, whether to use xavier initializer
-
-        Returns:
-            Variable Tensor
-    """
-    if use_xavier:
-        initializer = tf.contrib.layers.xavier_initializer()
-    else:
-        initializer = tf.truncated_normal_initializer(stddev=stddev)
-    var = _variable_on_cpu(name, shape, initializer)
-    if wd is not None:
-        weight_decay = tf.multiply(tf.nn.l2_loss(var), wd, name='weight_loss')
-        tf.add_to_collection('losses', weight_decay)
-    return var
-
-
-def conv2d_with_act(inputs,
-           num_output_channels,
-           kernel_size,
-           scope,
-           stride=[1, 1],
-           padding='SAME',
-           use_xavier=True,
-           stddev=1e-3,
-           weight_decay=0.0,
-           activation_fn=tf.nn.relu,
-           bn=False,
-           bn_decay=None,
-           is_training=None):
-    """ 2D convolution with non-linear operation.
-
-        Args:
-            inputs: 4-D tensor variable BxHxWxC
-            num_output_channels: int
-            kernel_size: a list of 2 ints
-            scope: string
-            stride: a list of 2 ints
-            padding: 'SAME' or 'VALID'
-            use_xavier: bool, use xavier_initializer if true
-            stddev: float, stddev for truncated_normal init
-            weight_decay: float
-            activation_fn: function
-            bn: bool, whether to use batch norm
-            bn_decay: float or float tensor variable in [0,1]
-            is_training: bool Tensor variable
-
-        Returns:
-            Variable tensor
-    """
-    with tf.variable_scope(scope) as sc:
-            
-            kernel_h, kernel_w = kernel_size
-            num_in_channels = inputs.get_shape()[-1].value
-            kernel_shape = [kernel_h, kernel_w,
-                              num_in_channels, num_output_channels]
-            kernel = _variable_with_weight_decay('weights',
-                                           shape=kernel_shape,
-                                           use_xavier=use_xavier,
-                                           stddev=stddev,
-                                           wd=weight_decay)
-            stride_h, stride_w = stride
-            outputs = tf.nn.conv2d(inputs, kernel,
-                             [1, stride_h, stride_w, 1],
-                             padding=padding)
-            biases = _variable_on_cpu('biases', [num_output_channels],
-                                  tf.constant_initializer(0.0))
-            outputs = tf.nn.bias_add(outputs, biases)
-
-            if bn:
-                outputs = batch_norm_for_conv2d(outputs, is_training,
-                                        bn_decay=bn_decay, scope='bn')
-
-            if activation_fn is not None:
-                outputs = activation_fn(outputs)
-            return outputs
-
-
-def conv2d_transpose_with_act(inputs,
-                     num_output_channels,
-                     kernel_size,
-                     scope,
-                     stride=[1, 1],
-                     padding='SAME',
-                     use_xavier=True,
-                     stddev=1e-3,
-                     weight_decay=0.0,
-                     activation_fn=tf.nn.relu,
-                     bn=False,
-                     bn_decay=None,
-                     is_training=None):
+import math
     
-    """ 2D convolution transpose with non-linear operation.
-
-        Args:
-            inputs: 4-D tensor variable BxHxWxC
-            num_output_channels: int
-            kernel_size: a list of 2 ints
-            scope: string
-            stride: a list of 2 ints
-            padding: 'SAME' or 'VALID'
-            use_xavier: bool, use xavier_initializer if true
-            stddev: float, stddev for truncated_normal init
-            weight_decay: float
-            activation_fn: function
-            bn: bool, whether to use batch norm
-            bn_decay: float or float tensor variable in [0,1]
-            is_training: bool Tensor variable
-
-        Returns:
-            Variable tensor
-            Note: conv2d(conv2d_transpose(a, num_out, ksize, stride), a.shape[-1], ksize, stride) == a
+#########################################################################################
+### those are for DeepGCN
+def pairwise_distance(point_cloud):
+    """Compute pairwise distance of a point cloud.
+       Args:
+           point_cloud: tensor (batch_size, num_points, num_dims)
+       Returns:
+           pairwise distance: (batch_size, num_points, num_points)
     """
-    with tf.variable_scope(scope) as sc:
-        
-        kernel_h, kernel_w = kernel_size
-        num_in_channels = inputs.get_shape()[-1].value
-        kernel_shape = [kernel_h, kernel_w,
-                        num_output_channels, num_in_channels] # reversed to conv2d
-        kernel = _variable_with_weight_decay('weights',
-                                           shape=kernel_shape,
-                                           use_xavier=use_xavier,
-                                           stddev=stddev,
-                                           wd=weight_decay)
-        stride_h, stride_w = stride
-      
-        # from slim.convolution2d_transpose
-        def get_deconv_dim(dim_size, stride_size, kernel_size, padding):
-            dim_size *= stride_size
+    og_batch_size = point_cloud.get_shape().as_list()[0]
+    point_cloud = tf.squeeze(point_cloud)
+    if og_batch_size == 1:
+        point_cloud = tf.expand_dims(point_cloud, 0)
 
-            if padding == 'VALID' and dim_size is not None:
-                dim_size += max(kernel_size - stride_size, 0)
-            return dim_size
+    point_cloud_transpose = tf.transpose(point_cloud, perm=[0, 2, 1])
+    point_cloud_inner = tf.matmul(point_cloud, point_cloud_transpose)
+    point_cloud_inner = -2*point_cloud_inner
+    point_cloud_square = tf.reduce_sum(tf.square(point_cloud), axis=-1, keep_dims=True)
+    point_cloud_square_tranpose = tf.transpose(point_cloud_square, perm=[0, 2, 1])
+    return point_cloud_square + point_cloud_inner + point_cloud_square_tranpose
 
-        # caculate output shape
-        batch_size = inputs.get_shape()[0].value
-        height = inputs.get_shape()[1].value
-        width = inputs.get_shape()[2].value
-        out_height = get_deconv_dim(height, stride_h, kernel_h, padding)
-        out_width = get_deconv_dim(width, stride_w, kernel_w, padding)
-        output_shape = [batch_size, out_height, out_width, num_output_channels]
+def knn(adj_matrix, k=20):
+    """Get KNN based on the pairwise distance.
+       Args:
+          pairwise distance: (batch_size, num_points, num_points)
+          k: int
+       Returns:
+          nearest neighbors: (batch_size, num_points, k)
+     """
+    neg_adj = -adj_matrix
+    _, nn_idx = tf.nn.top_k(neg_adj, k=k)
+    return nn_idx
 
-        outputs = tf.nn.conv2d_transpose(inputs, kernel, output_shape,
-                             [1, stride_h, stride_w, 1],
-                             padding=padding)
-        biases = _variable_on_cpu('biases', [num_output_channels],
-                                tf.constant_initializer(0.0))
-        outputs = tf.nn.bias_add(outputs, biases)
+def knn_graph(vertex_features, k):
+    '''Find the neighbors' indices based on knn'''
+    dists = pairwise_distance(vertex_features)
+    neigh_idx = knn(dists, k=k) # (batch, num_points, k)
+    return neigh_idx
 
-        if bn:
-            outputs = batch_norm_for_conv2d(outputs, is_training,
-                                        bn_decay=bn_decay, scope='bn')
+def get_edge_feature(point_cloud, nn_idx, k):
+    """Construct edge feature for each point
+       Args:
+           point_cloud: (batch_size, num_points, 1, num_dims)
+           nn_idx: (batch_size, num_points, k)
+           k: int
+       Returns:
+           edge features: (batch_size, num_points, k, num_dims)  [8, 1024, 16, 3]
+     """
+    og_batch_size = point_cloud.get_shape().as_list()[0]
+    point_cloud = tf.squeeze(point_cloud)
+    if og_batch_size == 1:
+        point_cloud = tf.expand_dims(point_cloud, 0)
 
-        if activation_fn is not None:
-            outputs = activation_fn(outputs)
-        return outputs
+    point_cloud_central = point_cloud
 
+    point_cloud_shape = point_cloud.get_shape()
+    batch_size = point_cloud_shape[0].value
+    num_points = point_cloud_shape[1].value
+    num_dims = point_cloud_shape[2].value
 
-def conv3d_with_act(inputs,
-           num_output_channels,
-           kernel_size,
-           scope,
-           stride=[1, 1, 1],
-           padding='SAME',
-           use_xavier=True,
-           stddev=1e-3,
-           weight_decay=0.0,
-           activation_fn=tf.nn.relu,
-           bn=False,
-           bn_decay=None,
-           is_training=None):
-    """ 3D convolution with non-linear operation.
+    idx_ = tf.range(batch_size) * num_points
+    idx_ = tf.reshape(idx_, [batch_size, 1, 1])
 
-        Args:
-            inputs: 5-D tensor variable BxDxHxWxC
-            num_output_channels: int
-            kernel_size: a list of 3 ints
-            scope: string
-            stride: a list of 3 ints
-            padding: 'SAME' or 'VALID'
-            use_xavier: bool, use xavier_initializer if true
-            stddev: float, stddev for truncated_normal init
-            weight_decay: float
-            activation_fn: function
-            bn: bool, whether to use batch norm
-            bn_decay: float or float tensor variable in [0,1]
-            is_training: bool Tensor variable
+    point_cloud_flat = tf.reshape(point_cloud, [-1, num_dims])
+    point_cloud_neighbors = tf.gather(point_cloud_flat, nn_idx+idx_)
+    point_cloud_central = tf.expand_dims(point_cloud_central, axis=-2)
 
-        Returns:
-            Variable tensor
-  """
-    with tf.variable_scope(scope) as sc:
-        kernel_d, kernel_h, kernel_w = kernel_size
-        num_in_channels = inputs.get_shape()[-1].value
-        kernel_shape = [kernel_d, kernel_h, kernel_w,
-                        num_in_channels, num_output_channels]
-        kernel = _variable_with_weight_decay('weights',
-                                         shape=kernel_shape,
-                                         use_xavier=use_xavier,
-                                         stddev=stddev,
-                                         wd=weight_decay)
-        stride_d, stride_h, stride_w = stride
-        outputs = tf.nn.conv3d(inputs, kernel,
-                           [1, stride_d, stride_h, stride_w, 1],
-                           padding=padding)
-        biases = _variable_on_cpu('biases', [num_output_channels],
-                              tf.constant_initializer(0.0))
-        outputs = tf.nn.bias_add(outputs, biases)
+    point_cloud_central = tf.tile(point_cloud_central, [1, 1, k, 1])
+
+    edge_feature = tf.concat([point_cloud_central, point_cloud_neighbors-point_cloud_central], axis=-1)
+    return edge_feature
+
+def edge_conv_layer(inputs,
+              neigh_idx,
+              nn,
+              k,
+              num_outputs,
+              scope=None,
+              is_training=None):
     
-        if bn:
-            outputs = batch_norm_for_conv3d(outputs, is_training,
-                                      bn_decay=bn_decay, scope='bn')
+    '''
+      EdgeConv layer:
+        Wang, Y, Yongbin S, Ziwei L, Sanjay S, Michael B, Justin S.
+        "Dynamic graph cnn for learning on point clouds."
+        arXiv:1801.07829 (2018).
+    '''
+    edge_features = get_edge_feature(inputs, neigh_idx, k)
+    out = nn.build(edge_features,
+                 num_outputs,
+                 scope=scope,
+                 is_training=is_training)
+    vertex_features = tf.reduce_max(out, axis=-2, keep_dims=True)
 
-        if activation_fn is not None:
-            outputs = activation_fn(outputs)
-        return outputs
-
-def fully_connected_with_act(inputs,
-                    num_outputs,
-                    scope,
-                    use_xavier=True,
-                    stddev=1e-3,
-                    weight_decay=0.0,
-                    activation_fn=tf.nn.relu,
-                    bn=False,
-                    bn_decay=None,
-                    is_training=None):
-    """ Fully connected layer with non-linear operation.
-
-        Args:
-            inputs: 2-D tensor BxN
-            num_outputs: int
-  
-        Returns:
-            Variable tensor of size B x num_outputs.
-    """
-    with tf.variable_scope(scope) as sc:
-        num_input_units = inputs.get_shape()[-1].value
-        weights = _variable_with_weight_decay('weights',
-                                          shape=[num_input_units, num_outputs],
-                                          use_xavier=use_xavier,
-                                          stddev=stddev,
-                                          wd=weight_decay)
-        outputs = tf.matmul(inputs, weights)
-        biases = _variable_on_cpu('biases', [num_outputs],
-                             tf.constant_initializer(0.0))
-        outputs = tf.nn.bias_add(outputs, biases)
-     
-        if bn:
-            outputs = batch_norm_for_fc(outputs, is_training, bn_decay, 'bn')
-
-        if activation_fn is not None:
-            outputs = activation_fn(outputs)
-        return outputs
+    return vertex_features
+##########################################################################################
 
 
-def max_pool2d(inputs,
-               kernel_size,
-               scope,
-               stride=[2, 2],
-               padding='VALID'):
-    """ 2D max pooling.
+def shuffle_mini_batches(X, Y_cls, Y_seg, info, batch_size, adj = False):
+    '''
+    Creates a list of random minibatches from (X, Y)
 
-        Args:
-            inputs: 4-D tensor BxHxWxC
-            kernel_size: a list of 2 ints
-            stride: a list of 2 ints
+    Arguments:
+    X -- input data, of shape (n, nums_point, 3)
+    Y -- true "label" vector (containing 0 if negative, 1 if positive), of shape (n, nums_point)
+    batch_size - size of the mini-batches, integer
 
-        Returns:
-            Variable tensor
-    """
-    with tf.variable_scope(scope) as sc:
-        kernel_h, kernel_w = kernel_size
-        stride_h, stride_w = stride
-        outputs = tf.nn.max_pool(inputs,
-                             ksize=[1, kernel_h, kernel_w, 1],
-                             strides=[1, stride_h, stride_w, 1],
-                             padding=padding,
-                             name=sc.name)
-        return outputs
+    Returns:
+    mini_batches -- list of (mini_batch_X, mini_batch_Y)
+    '''
 
-def avg_pool2d(inputs,
-               kernel_size,
-               scope,
-               stride=[2, 2],
-               padding='VALID'):
-    """ 2D avg pooling.
+    m = X.shape[0]                  # number of training examples
+    mini_batches = []
 
-        Args:
-            inputs: 4-D tensor BxHxWxC
-            kernel_size: a list of 2 ints
-            stride: a list of 2 ints
-  
-        Returns:
-            Variable tensor
-    """
-    with tf.variable_scope(scope) as sc:
-        kernel_h, kernel_w = kernel_size
-        stride_h, stride_w = stride
-        outputs = tf.nn.avg_pool(inputs,
-                             ksize=[1, kernel_h, kernel_w, 1],
-                             strides=[1, stride_h, stride_w, 1],
-                             padding=padding,
-                             name=sc.name)
-        return outputs
+    permutation = list(np.random.permutation(m))
+    shuffled_X = X[permutation, :,:]
+    shuffled_Y_cls = Y_cls[permutation,]
+    shuffled_Y_seg = Y_seg[permutation, :]
+    shuffled_info = info[permutation, :]
+    if type(adj) == np.ndarray:
+        shuffled_adj = adj[permutation, :,:]
 
+    num_complete_minibatches = math.floor(m/batch_size) # number of mini batches of size mini_batch_size in your partitionning
+    for k in range(0, num_complete_minibatches):
+        mini_batch_X = shuffled_X[k * batch_size : k * batch_size + batch_size, :,:]
+        mini_batch_Y_cls = shuffled_Y_cls[k * batch_size : k * batch_size + batch_size,]
+        mini_batch_Y_seg = shuffled_Y_seg[k * batch_size : k * batch_size + batch_size, :]
+        mini_batch_info = shuffled_info[k * batch_size : k * batch_size + batch_size, :]
+        if type(adj) == np.ndarray:
+            mini_batch_adj = shuffled_adj[k * batch_size : k * batch_size + batch_size, :, :]
+        if type(adj) == np.ndarray:
+            mini_batch = (mini_batch_X, mini_batch_Y_cls, mini_batch_Y_seg, mini_batch_info, mini_batch_adj)
+        else: mini_batch = (mini_batch_X, mini_batch_Y_cls, mini_batch_Y_seg, mini_batch_info)
+        mini_batches.append(mini_batch)
 
-def max_pool3d(inputs,
-               kernel_size,
-               scope,
-               stride=[2, 2, 2],
-               padding='VALID'):
-    """ 3D max pooling.
-        Args:
-            inputs: 5-D tensor BxDxHxWxC
-            kernel_size: a list of 3 ints
-            stride: a list of 3 ints
+    # Handling the end case (last mini-batch < batch_size)
+    if m % batch_size != 0:
+#         mini_batch_X = shuffled_X[num_complete_minibatches * batch_size : m, :,:]
+#         mini_batch_Y = shuffled_Y[num_complete_minibatches * batch_size : m, :]
+        mini_batch_X = shuffled_X[m - batch_size : m, :,:]
+        mini_batch_Y_cls = shuffled_Y_cls[m - batch_size : m,]
+        mini_batch_Y_seg = shuffled_Y_seg[m - batch_size : m, :]
+        mini_batch_info = shuffled_info[m - batch_size : m, :]
+        if type(adj) == np.ndarray:
+            mini_batch_adj = shuffled_adj[m - batch_size : m, :,:]
+        if type(adj) == np.ndarray:
+            mini_batch = (mini_batch_X, mini_batch_Y_cls, mini_batch_Y_seg, mini_batch_info, mini_batch_adj)
+        else: mini_batch = (mini_batch_X, mini_batch_Y_cls, mini_batch_Y_seg, mini_batch_info)
+        mini_batches.append(mini_batch)
 
-        Returns:
-            Variable tensor
-    """
-    with tf.variable_scope(scope) as sc:
-        kernel_d, kernel_h, kernel_w = kernel_size
-        stride_d, stride_h, stride_w = stride
-        outputs = tf.nn.max_pool3d(inputs,
-                               ksize=[1, kernel_d, kernel_h, kernel_w, 1],
-                               strides=[1, stride_d, stride_h, stride_w, 1],
-                               padding=padding,
-                               name=sc.name)
-        return outputs
+    return mini_batches
 
-def avg_pool3d(inputs,
-               kernel_size,
-               scope,
-               stride=[2, 2, 2],
-               padding='VALID'):
-    """ 3D avg pooling.
-
-        Args:
-            inputs: 5-D tensor BxDxHxWxC
-            kernel_size: a list of 3 ints
-            stride: a list of 3 ints
-  
-        Returns:
-            Variable tensor
-    """
-    with tf.variable_scope(scope) as sc:
-        kernel_d, kernel_h, kernel_w = kernel_size
-        stride_d, stride_h, stride_w = stride
-        outputs = tf.nn.avg_pool3d(inputs,
-                               ksize=[1, kernel_d, kernel_h, kernel_w, 1],
-                               strides=[1, stride_d, stride_h, stride_w, 1],
-                               padding=padding,
-                               name=sc.name)
-        return outputs
-
-
-def batch_norm_template(inputs, is_training, scope, moments_dims, bn_decay):
-    """ Batch normalization on convolutional maps and beyond...
-        Ref.: http://stackoverflow.com/questions/33949786/how-could-i-use-batch-normalization-in-tensorflow
-  
-        Args:
-            inputs:        Tensor, k-D input ... x C could be BC or BHWC or BDHWC
-            is_training:   boolean tf.Varialbe, true indicates training phase
-            scope:         string, variable scope
-            moments_dims:  a list of ints, indicating dimensions for moments calculation
-            bn_decay:      float or float tensor variable, controling moving average weight
-
-        Return:
-            normed:        batch-normalized maps
-    """
-    with tf.variable_scope(scope) as sc:
-        num_channels = inputs.get_shape()[-1].value
-        beta = tf.Variable(tf.constant(0.0, shape=[num_channels]),
-                       name='beta', trainable=True)
-        gamma = tf.Variable(tf.constant(1.0, shape=[num_channels]),
-                        name='gamma', trainable=True)
-        batch_mean, batch_var = tf.nn.moments(inputs, moments_dims, name='moments')
-        decay = bn_decay if bn_decay is not None else 0.9
-        ema = tf.train.ExponentialMovingAverage(decay=decay)
-        # Operator that maintains moving averages of variables.
-        ema_apply_op = tf.cond(is_training,
-                           lambda: ema.apply([batch_mean, batch_var]),
-                           lambda: tf.no_op())
-    
-        # Update moving average and return current batch's avg and var.
-        def mean_var_with_update():
-            with tf.control_dependencies([ema_apply_op]):
-                return tf.identity(batch_mean), tf.identity(batch_var)
-    
-        # ema.average returns the Variable holding the average of var.
-        mean, var = tf.cond(is_training,
-                        mean_var_with_update,
-                        lambda: (ema.average(batch_mean), ema.average(batch_var)))
-        normed = tf.nn.batch_normalization(inputs, mean, var, beta, gamma, 1e-3)
-    return normed
-
-
-def batch_norm_for_fc(inputs, is_training, bn_decay, scope):
-    """ Batch normalization on FC data.
-  
-        Args:
-            inputs:      Tensor, 2D BxC input
-            is_training: boolean tf.Varialbe, true indicates training phase
-            bn_decay:    float or float tensor variable, controling moving average weight
-            scope:       string, variable scope
-
-        Return:
-            normed:      batch-normalized maps
-    """
-    return batch_norm_template(inputs, is_training, scope, [0,], bn_decay)
-
-
-def batch_norm_for_conv1d(inputs, is_training, bn_decay, scope):
-    """ Batch normalization on 1D convolutional maps.
-
-        Args:
-            inputs:      Tensor, 3D BLC input maps
-            is_training: boolean tf.Varialbe, true indicates training phase
-            bn_decay:    float or float tensor variable, controling moving average weight
-            scope:       string, variable scope
-
-        Return:
-            normed:      batch-normalized maps
-    """
-    return batch_norm_template(inputs, is_training, scope, [0,1], bn_decay)
-
-
-def batch_norm_for_conv2d(inputs, is_training, bn_decay, scope):
-    """ Batch normalization on 2D convolutional maps.
-
-        Args:
-            inputs:      Tensor, 4D BHWC input maps
-            is_training: boolean tf.Varialbe, true indicates training phase
-            bn_decay:    float or float tensor variable, controling moving average weight
-            scope:       string, variable scope
-
-        Return:
-            normed:      batch-normalized maps
-    """
-    return batch_norm_template(inputs, is_training, scope, [0,1,2], bn_decay)
-
-
-def batch_norm_for_conv3d(inputs, is_training, bn_decay, scope):
-    """ Batch normalization on 3D convolutional maps.
-
-        Args:
-            inputs:      Tensor, 5D BDHWC input maps
-            is_training: boolean tf.Varialbe, true indicates training phase
-            bn_decay:    float or float tensor variable, controling moving average weight
-            scope:       string, variable scope
-
-        Return:
-            normed:      batch-normalized maps
-    """
-    return batch_norm_template(inputs, is_training, scope, [0,1,2,3], bn_decay)
 

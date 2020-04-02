@@ -1,11 +1,11 @@
 # -*- encoding: utf-8 -*-
 ''' loss functions for keras implementation
 
-Author: Ze Ma, Minghui Hu
-Date: August 2019
+Author: Ze Ma
+Date: December 2019
 
 (C) Copyright: Unionstrong (Beijing) Technology Co., Ltd
-2016-2019 All Right Reserved
+2016-2020 All Right Reserved
 '''
 from .metrics_keras import dice_coefficient, weighted_dice_coefficient
 

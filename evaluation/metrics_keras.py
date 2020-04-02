@@ -35,6 +35,8 @@ def label_wise_dice_coefficient(y_true, y_pred, label_index):
 
 
 def get_label_dice_coefficient_function(label_index):
+    """ like a wrapper, show the dice coefficient function for each label
+    """
     f = partial(label_wise_dice_coefficient, label_index=label_index)
     f.__setattr__('__name__', 'label_{0}_dice_coef'.format(label_index))
     return f

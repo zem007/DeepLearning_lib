@@ -5,7 +5,7 @@ Author: Ze Ma
 Date: November 2019
 
 (C) Copyright: Unionstrong (Beijing) Technology Co., Ltd
-2016-2019 All Right Reserved
+2016-2020 All Right Reserved
 '''
 import os
 import time
@@ -31,6 +31,23 @@ class Unet3D(Model3D):
              n_base_filters, 
              batch_normalization, 
              activation_name):
+        """ return keras model
+            Args:
+            which_gpu: str, eg. '0', '1', '2'..., indicating which gpu to run the model
+            n_outputs: int, the class nums
+            input_shape: Shape of the input data (x_size, y_size, z_size, n_chanels). The x, y, and z sizes must be
+                    divisible by the pool size to the power of the depth of the UNet, that is pool_size^depth.
+            pool_size: tuple of int, pool size for the max pooling operations
+            deconvolution: bool, if set to True, will use transpose deconvolution instead of up-sampling. This
+                      increases the amount memory required during training.
+            depth: int, indicating the depth of the U-shape for the model. The greater the depth, the more max pooling
+                layers will be added to the model. Lowering the depth may reduce the amount of memory required for training
+            n_base_filters: int, the number of filters that the first layer in the convolution network will have. Following
+                      layers will contain a multiple of this number. Lowering this number will likely reduce the amount of
+                      memory required to train the model
+            batch_normalization: bool, indicate whether to use batch_norm after this conv layer
+            activation_name: str, activation function for this layer, default by 'relu'
+        """
         self.which_gpu = which_gpu
         self.n_outputs = n_outputs
         self.input_shape = input_shape 
@@ -92,6 +109,12 @@ class Unet3D(Model3D):
                 loss_fun = None, 
                 metrics = None, 
                 initial_learning_rate = None):
+        """ Args:
+               input_optimizer: keras.optimizer
+               loss_fun: defined keras loss function
+               metrics: defined keras metrics
+               initial_learning_rate: float   
+        """
         model = self.model
         model.compile(optimizer=input_optimizer, loss=loss_fun, metrics=metrics)
         model.summary()
@@ -99,6 +122,11 @@ class Unet3D(Model3D):
         self.model = model
     
     def callbacks(self, path, monitor = None, save_best_only = True):
+        """ Args:
+               path: str, model saving path
+               monitor: str, 'val_loss'
+               save_best_only: bool, indicating whether to save the best model only
+        """
         dirname = os.path.dirname(path)
         if os.path.exists(dirname) == False:
             os.mkdir(dirname)
@@ -119,6 +147,19 @@ class Unet3D(Model3D):
                shuffle = True, 
                class_weight = None, 
                sample_weight = None):
+        """ train model without data augmentation
+            Args:
+                x_train: np.array of shape (n, width, length, channel, 1)
+                labels_train: np.array of shape (n, width, length, channel, class_nums)
+                x_val: similiar with x_train
+                labels_val: similiar with labels_train
+                epochs: int
+                verbose: int, 0 or 1
+                callbacks: can input callback function
+                shuffle: bool
+                class_weight: dict, adjust loss function weight for different classes
+                sample_weight: np.array, adjust loss function weight for different samples       
+        """
         # select training gpu
         which_gpu = self.which_gpu
         os.environ["CUDA_VISIBLE_DEVICES"] = which_gpu
@@ -135,6 +176,16 @@ class Unet3D(Model3D):
                   x_val = None, 
                   labels_val = None, 
                   callbacks = None):
+        """
+            Args: 
+                 gen: input keras generator instance
+                 steps_per_epoch: int, define how many batches for one epoch
+                 epochs: int
+                 verbose: int, 0 or 1
+                 x_val: similiar with x_train
+                 labels_val: similiar with labels_train
+                 callbacks: can input callback function
+        """
         # select training gpu
         which_gpu = self.which_gpu
         os.environ["CUDA_VISIBLE_DEVICES"] = which_gpu
@@ -145,6 +196,10 @@ class Unet3D(Model3D):
             
 
     def load(self, path):
+        """
+           Args:
+               path: str, the model saving file path
+        """
         # select training gpu
         which_gpu = self.which_gpu
         os.environ["CUDA_VISIBLE_DEVICES"] = which_gpu
@@ -154,6 +209,10 @@ class Unet3D(Model3D):
         self.model = model
     
     def predict(self, pred_img):
+        """
+            Args:
+                pred_img: np.array of shape (1, width, length, channel, 1)
+        """
         model = self.model
         pred_prob = model.predict(pred_img, batch_size = 1)
         pred_prob = np.squeeze(pred_prob)
@@ -168,6 +227,11 @@ class Unet3D(Model3D):
         return pred_mask
         
     def evaluate(self, x_val, labels_val, batch_size, sample_weight):
+        """
+            Args:
+                x_val: similiar with x_train
+                labels_val: similiar with labels_train
+        """
         model = self.model
         scores = model.evaluate(x_val, labels_val, batch_size = batch_size, sample_weight = sample_weight, verbose = 1) # may OOM
         print('evaluation result: ', str(scores))  

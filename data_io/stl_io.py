@@ -9,20 +9,21 @@ Date: August 2019
 '''
 from .data_io import DataIoBase
 import pandas as pd
-import numpy as np
+import vtk
 
-class DataFrameIo(DataIoBase):
+class StlIo(DataIoBase):
     
     def __init__(self):
         pass
         
     def load(filename):
-        df = pd.read_pickle(filename)
-        return df
+        stl_reader = vtk.vtkSTLReader()
+        stl_reader.SetFileName(filename)
+        stl_reader.Update()
+        return stl_reader.GetOutput()
     
-    def save(filename, df):
-        super().create_folder(filename)
-        df.to_pickle(filename)
-        print('saved to: ', filename)
-        
-    
+    def save(self, filename, df):
+#         super().create_folder(filename)
+#         df.to_pickle(filename)
+#         print('saved to: ', filename)
+        pass

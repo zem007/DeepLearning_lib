@@ -5,18 +5,13 @@ Author: Ze Ma
 Date: Novemeber 2019
 
 (C) Copyright: Unionstrong (Beijing) Technology Co., Ltd
-2016-2019 All Right Reserved
+2016-2010 All Right Reserved
 '''
 import SimpleITK as sitk
 from .data_io import DataIoBase
 
 class ImageIo(DataIoBase):
-    """ pd.dataframe io
-
-        Args:
-        
-        Returns:
-            
+    """ load original image with SimpleITK, read to np.array
     """
     def __init__(self):
         pass
