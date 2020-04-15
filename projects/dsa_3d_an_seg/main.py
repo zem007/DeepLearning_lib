@@ -15,7 +15,7 @@ import math
 import argparse
 from data_io.numpy_io import NumpyIo
 from data_io.image_io import ImageIo
-from mappers.generator_keras import keras_image_generator_2D, image_generator_2Dto3D
+from mappers.generator_keras import keras_image_generator_2D, image_generator_2Dto3D_with_mask
 from evaluation.metrics_keras import get_label_dice_coefficient_function
 from models.keras_models.unet3D import Unet3D
 from utils.data_io_utils import get_file_dir_lists, split_dataset
@@ -107,22 +107,23 @@ def get_small_image_mask_block(x_image, mask_image, vessel_image, size):
     return small_img_array, small_mask_array
 
 def generate_data(ImageIo, NumpyIo, image_path, an_path, vessel_path, drop_list, block_size = 64, save = False, save_path = None):
-    """generate train, val and test dataset from the original image and mask. convert them to np.array and save
-        Args:
-            ImageIo: image io class
-            NumpyIo: numpy io class
-            image_path: orginal image saving path
-            an_path: an saving path
-            vessel_path: vessel saving path
-            drop_list: list of str, indicating samples that are needed to be dropped
-            block_size: int, indicating the small image block size
-            save: bool, save the datasets or not
-            save_path: if save is True, save the three dataset to the path
-        Returns:
-            (x_train, labels_train), (x_test, labels_test), (x_val, labels_val):
-                Three datasets, and each one includes both images and labels 
-            data_seperate: list of list, the filename for each sample and its corresponding dataset
-    """
+    
+        """generate train, val and test dataset from the original image and mask. convert them to np.array and save
+            Args:
+                ImageIo: image io class
+                NumpyIo: numpy io class
+                image_path: orginal image saving path
+                an_path: an saving path
+                vessel_path: vessel saving path
+                drop_list: list of str, indicating samples that are needed to be dropped
+                block_size: int, indicating the small image block size
+                save: bool, save the datasets or not
+                save_path: if save is True, save the three dataset to the path
+            Returns:
+                (x_train, labels_train), (x_test, labels_test), (x_val, labels_val):
+                    Three datasets, and each one includes both images and labels 
+                data_seperate: list of list, the filename for each sample and its corresponding dataset
+        """
         print('load img from the source dir: ', image_path)
         img_dir_list = get_file_dir_lists(image_path, drop_list)
         print('load an from the source dir: ', an_path)
